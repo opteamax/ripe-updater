@@ -1,28 +1,43 @@
 # netbox-ripe-sync
 
-A **native NetBox 4.x plugin** that automatically synchronises inetnum and inet6num
-objects to the RIPE Database whenever a prefix is created, updated, or deleted in
-NetBox.
+A **native NetBox 4.x plugin** that:
+
+1. **Automatically synchronises** inetnum and inet6num objects to the RIPE
+   Database whenever a prefix is created, updated, or deleted in NetBox.
+2. **Imports resources** from the RIPE LIR Portal My Resources API — pulling
+   your ASNs, allocations, and assignments directly into NetBox.
 
 > **Migration note:** This replaces the legacy `ripe-updater` Flask sidecar.
 > The original code is kept in `ripeupdater/` for reference only.
-> Key changes: RIPE MNT-password auth → API key auth; standalone service → native
-> NetBox plugin; pynetbox webhooks → Django ORM signals.
+> Key changes: RIPE MNT-password auth → API key auth; standalone service →
+> native NetBox plugin; pynetbox webhooks → Django ORM signals.
 
 ---
 
 ## Features
 
+### RIPE Database Sync (outbound)
+
 - Automatic create / update / delete driven by NetBox prefix save/delete signals
 - RIPE Database API key authentication (replaces deprecated MD5 password)
-- IPv4 (inetnum) and IPv6 (inet6num) support
+- IPv4 (`inetnum`) and IPv6 (`inet6num`) support
 - File-based JSON template system (same format as legacy ripe-updater)
 - Overlap detection and automatic resolution
 - Per-prefix sync log visible in the NetBox UI
 - "Sync Now" button on the prefix detail page
-- Optional S3 backup of objects before modification
-- Management command to create required custom fields
-- REST API endpoint for programmatic sync triggers
+- Optional S3 backup of RIPE objects before modification
+
+### My Resources Import (inbound)
+
+- Fetch all resources from the RIPE LIR Portal My Resources API in one click
+- Imports ASNs → `ipam.ASN`, allocations → `ipam.Aggregate`, assignments → `ipam.Prefix`
+- Dry-run mode — preview what would be created without touching NetBox
+- Selective import via resource-type filter
+- Never overwrites existing objects (idempotent)
+- All imported objects tagged `ripe-my-resources` for easy identification
+- Import run history with per-type counters and per-resource error detail
+- Background execution via django-rq so large imports don't block the UI
+- Management command (`ripe_import_resources`) for CLI / cron use without a worker
 
 ---
 
@@ -32,7 +47,9 @@ NetBox.
 - Python ≥ 3.10
 - `iso3166` Python package
 - RQ worker running (`python manage.py rqworker default`)
-- RIPE NCC Access account with a Database API key
+- RIPE NCC Access account with:
+  - A **Database API key** (for outbound sync)
+  - An **LIR Portal API key** (for My Resources import)
 
 ---
 
@@ -51,10 +68,13 @@ PLUGINS = ['netbox_ripe_sync']
 
 PLUGINS_CONFIG = {
     'netbox_ripe_sync': {
-        # --- Required ---
-        'ripe_api_key_id':     'YOUR_KEY_ID',      # from LIR Portal → API Keys
+        # --- RIPE Database sync (outbound) ---
+        'ripe_api_key_id':     'YOUR_KEY_ID',      # LIR Portal → API Keys → Database key
         'ripe_api_key_secret': 'YOUR_KEY_SECRET',
         'templates_dir':       '/opt/netbox/ripe_templates',
+
+        # --- My Resources import (inbound) ---
+        'lir_portal_api_key':  'YOUR_LIR_PORTAL_KEY',  # LIR Portal → API Keys → Portal key
 
         # --- Recommended ---
         'ripe_db':             'RIPE',   # 'TEST' (default) or 'RIPE'
@@ -95,11 +115,13 @@ python manage.py ripe_sync_setup
 
 ---
 
-## RIPE API Key
+## Authentication
 
-Generate an API key in the [RIPE LIR Portal](https://my.ripe.net) under
-**My Account → API Keys → Create a new Database key**.  The key is displayed
-only once; save both the Key ID and the key secret.
+### RIPE Database API Key (outbound sync)
+
+Generate a **Database** API key in the [RIPE LIR Portal](https://my.ripe.net)
+under **My Account → API Keys → Create a new Database key**.
+Save both the Key ID and the key secret — the secret is shown only once.
 
 The plugin authenticates using HTTP Basic Auth:
 
@@ -107,9 +129,62 @@ The plugin authenticates using HTTP Basic Auth:
 Authorization: Basic base64(key_id:key_secret)
 ```
 
+### LIR Portal API Key (My Resources import)
+
+Generate a **Portal** API key in the LIR Portal under
+**My Account → API Keys → Create a new LIR Portal key**.
+
+The plugin sends it as a single header:
+
+```http
+ncc-api-authorization: YOUR_LIR_PORTAL_KEY
+```
+
 ---
 
-## Custom Fields
+## My Resources Import
+
+### Via the NetBox UI
+
+Navigate to **RIPE Sync → Import Runs** and click **Import Now**.
+A modal lets you choose:
+
+- **Dry run** — log what would be created without actually creating anything
+- **Resource types** — comma-separated subset (leave blank for all):
+  `asns`, `ipv4_allocations`, `ipv4_assignments`, `ipv4_legacy`,
+  `ipv6_allocations`, `ipv6_assignments`
+
+The import runs in the background; refresh the list to see results.
+
+### Via the management command
+
+Runs synchronously in the current process — no RQ worker needed:
+
+```bash
+# Import everything
+python manage.py ripe_import_resources
+
+# Preview without making changes
+python manage.py ripe_import_resources --dry-run
+
+# Import only ASNs and IPv4 allocations
+python manage.py ripe_import_resources --only asns ipv4_allocations
+```
+
+### NetBox object mapping
+
+| My Resources type | NetBox object |
+| --- | --- |
+| ASNs | `ipam.ASN` (linked to RIPE NCC RIR) |
+| IPv4 / IPv6 allocations | `ipam.Aggregate` |
+| IPv4 legacy / ERX resources | `ipam.Aggregate` |
+| IPv4 / IPv6 assignments | `ipam.Prefix` |
+
+Existing objects are never modified; they are counted as *skipped*.
+
+---
+
+## Custom Fields (outbound sync)
 
 | Field | Model | Type | Purpose |
 | --- | --- | --- | --- |
@@ -119,7 +194,7 @@ Authorization: Basic base64(key_id:key_secret)
 
 ---
 
-## Template Files
+## Template Files (outbound sync)
 
 Place all template files in `templates_dir`:
 
@@ -139,7 +214,7 @@ unchanged.
 ## Region → Country Mapping
 
 The plugin walks a prefix's Site → Region hierarchy looking for an ISO 3166-1
-alpha-2 country code.  Either:
+alpha-2 country code. Either:
 
 - Name a region with a two-letter slug (`de`, `nl`, `us`) — matched as alpha-2, or
 - Name a region after a full country name (`germany`, `netherlands`) — matched
