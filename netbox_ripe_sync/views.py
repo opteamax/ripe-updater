@@ -9,8 +9,8 @@ from django.views import View
 from django_tables2 import SingleTableMixin
 from django.views.generic import DetailView, ListView
 
-from .models import RipeSyncLog
-from .tables import RipeSyncLogTable
+from .models import RipeSyncLog, RipeImportRun
+from .tables import RipeSyncLogTable, RipeImportRunTable
 
 logger = logging.getLogger('netbox.plugins.ripe_sync')
 
@@ -66,3 +66,65 @@ class ManualSyncView(LoginRequiredMixin, View):
             messages.error(request, f'Failed to queue RIPE sync: {exc}')
 
         return HttpResponseRedirect(prefix.get_absolute_url())
+
+
+class RipeImportRunListView(LoginRequiredMixin, SingleTableMixin, ListView):
+    model = RipeImportRun
+    table_class = RipeImportRunTable
+    template_name = 'netbox_ripe_sync/ripeimportrun_list.html'
+    context_object_name = 'runs'
+    paginate_by = 25
+
+    def get_queryset(self):
+        return RipeImportRun.objects.order_by('-started')
+
+
+class RipeImportRunDetailView(LoginRequiredMixin, DetailView):
+    model = RipeImportRun
+    template_name = 'netbox_ripe_sync/ripeimportrun_detail.html'
+    context_object_name = 'run'
+
+    def get_context_data(self, **kwargs):
+        ctx = super().get_context_data(**kwargs)
+        ctx['error_detail'] = self.object.get_error_detail()
+        return ctx
+
+
+class TriggerImportView(LoginRequiredMixin, View):
+    """Create a RipeImportRun record and enqueue the background import job."""
+
+    def post(self, request):
+        import django_rq
+        from datetime import datetime, timezone
+        from .import_jobs import run_my_resources_import
+
+        dry_run = request.POST.get('dry_run') == '1'
+        only_raw = request.POST.get('resource_types', '').strip()
+        resource_types = [t.strip() for t in only_raw.split(',') if t.strip()] or None
+
+        run = RipeImportRun.objects.create(
+            status=RipeImportRun.STATUS_RUNNING,
+            triggered_by=request.user.username,
+            dry_run=dry_run,
+        )
+
+        try:
+            queue = django_rq.get_queue('default')
+            queue.enqueue(
+                run_my_resources_import,
+                run_id=run.pk,
+                dry_run=dry_run,
+                resource_types=resource_types,
+                triggered_by=request.user.username,
+            )
+            label = 'Dry-run' if dry_run else 'Import'
+            messages.success(request, f'{label} job queued (run #{run.pk}).')
+        except Exception as exc:
+            logger.exception('Failed to enqueue import job')
+            run.status = RipeImportRun.STATUS_FAILED
+            run.error_message = str(exc)
+            run.finished = datetime.now(tz=timezone.utc)
+            run.save(update_fields=['status', 'error_message', 'finished'])
+            messages.error(request, f'Failed to queue import: {exc}')
+
+        return HttpResponseRedirect(reverse('plugins:netbox_ripe_sync:ripeimportrun_list'))

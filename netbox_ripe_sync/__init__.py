@@ -12,9 +12,12 @@ class NetboxRipeSyncConfig(PluginConfig):
     min_version = '4.0.0'
 
     default_settings = {
+        # RIPE Database REST API (inetnum/inet6num sync)
         'ripe_db': 'TEST',
         'ripe_api_key_id': None,
         'ripe_api_key_secret': None,
+        # LIR Portal My Resources API (resource import)
+        'lir_portal_api_key': None,
         'templates_dir': '/opt/netbox/ripe_templates',
         'smallest_prefix_v4': 31,
         'smallest_prefix_v6': 127,

@@ -1,0 +1,117 @@
+{% extends 'base.html' %}
+
+{% block title %}RIPE Import Run #{{ run.pk }}{% endblock %}
+
+{% block content %}
+<div class="row mb-3">
+  <div class="col">
+    <h1 class="page-header">RIPE Import Run #{{ run.pk }}</h1>
+  </div>
+  <div class="col-auto">
+    <a href="{% url 'plugins:netbox_ripe_sync:ripeimportrun_list' %}" class="btn btn-outline-secondary">
+      <i class="mdi mdi-arrow-left"></i> All Runs
+    </a>
+  </div>
+</div>
+
+<div class="card mb-3">
+  <div class="card-header">
+    <h5 class="card-title mb-0">Run Details</h5>
+  </div>
+  <table class="table table-sm">
+    <tbody>
+      <tr>
+        <th style="width:20%">Status</th>
+        <td><span class="badge bg-{{ run.status_badge }}">{{ run.get_status_display }}</span></td>
+      </tr>
+      <tr><th>Dry Run</th><td>{{ run.dry_run|yesno:"Yes,No" }}</td></tr>
+      <tr><th>Triggered by</th><td>{{ run.triggered_by|default:"—" }}</td></tr>
+      <tr><th>Started</th><td>{{ run.started|date:"Y-m-d H:i:s" }}</td></tr>
+      <tr><th>Finished</th><td>{{ run.finished|date:"Y-m-d H:i:s"|default:"—" }}</td></tr>
+    </tbody>
+  </table>
+</div>
+
+<div class="card mb-3">
+  <div class="card-header">
+    <h5 class="card-title mb-0">Statistics</h5>
+  </div>
+  <table class="table table-sm">
+    <thead>
+      <tr>
+        <th>Type</th>
+        <th class="text-end">Created</th>
+        <th class="text-end">Skipped</th>
+        <th class="text-end">Errors</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td>ASNs</td>
+        <td class="text-end">{{ run.asns_created }}</td>
+        <td class="text-end">{{ run.asns_skipped }}</td>
+        <td class="text-end {% if run.asns_errors %}text-danger fw-bold{% endif %}">{{ run.asns_errors }}</td>
+      </tr>
+      <tr>
+        <td>Aggregates</td>
+        <td class="text-end">{{ run.aggregates_created }}</td>
+        <td class="text-end">{{ run.aggregates_skipped }}</td>
+        <td class="text-end {% if run.aggregates_errors %}text-danger fw-bold{% endif %}">{{ run.aggregates_errors }}</td>
+      </tr>
+      <tr>
+        <td>Prefixes</td>
+        <td class="text-end">{{ run.prefixes_created }}</td>
+        <td class="text-end">{{ run.prefixes_skipped }}</td>
+        <td class="text-end {% if run.prefixes_errors %}text-danger fw-bold{% endif %}">{{ run.prefixes_errors }}</td>
+      </tr>
+    </tbody>
+    <tfoot class="table-group-divider">
+      <tr class="fw-bold">
+        <td>Total</td>
+        <td class="text-end">{{ run.total_created }}</td>
+        <td class="text-end">{{ run.total_skipped }}</td>
+        <td class="text-end {% if run.total_errors %}text-danger{% endif %}">{{ run.total_errors }}</td>
+      </tr>
+    </tfoot>
+  </table>
+</div>
+
+{% if run.error_message %}
+<div class="card mb-3 border-danger">
+  <div class="card-header bg-danger text-white">
+    <h5 class="card-title mb-0">Error</h5>
+  </div>
+  <div class="card-body">
+    <pre class="mb-0 text-danger">{{ run.error_message }}</pre>
+  </div>
+</div>
+{% endif %}
+
+{% if error_detail %}
+<div class="card border-warning">
+  <div class="card-header">
+    <h5 class="card-title mb-0">Per-Resource Errors</h5>
+  </div>
+  <div class="card-body p-0">
+    <table class="table table-sm mb-0">
+      <thead>
+        <tr>
+          <th>Type</th>
+          <th>Identifier</th>
+          <th>Error</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for item in error_detail %}
+        <tr>
+          <td>{{ item.0 }}</td>
+          <td><code>{{ item.1 }}</code></td>
+          <td>{{ item.2 }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endif %}
+{% endblock %}
