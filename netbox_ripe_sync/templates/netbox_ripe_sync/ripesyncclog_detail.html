@@ -1,0 +1,47 @@
+{% extends 'base.html' %}
+
+{% block title %}RIPE Sync Log #{{ log.pk }}{% endblock %}
+
+{% block content %}
+<div class="row mb-3">
+  <div class="col">
+    <h1 class="page-header">RIPE Sync Log #{{ log.pk }}</h1>
+  </div>
+</div>
+
+<div class="card mb-3">
+  <div class="card-header">
+    <h5 class="card-title mb-0">Details</h5>
+  </div>
+  <table class="table table-sm">
+    <tbody>
+      <tr><th style="width:20%">Prefix</th><td>{{ log.prefix }}</td></tr>
+      <tr><th>Action</th><td>{{ log.get_action_display }}</td></tr>
+      <tr>
+        <th>Status</th>
+        <td><span class="badge bg-{{ log.status_badge }}">{{ log.get_status_display }}</span></td>
+      </tr>
+      <tr><th>Triggered by</th><td>{{ log.triggered_by|default:"—" }}</td></tr>
+      <tr><th>Timestamp</th><td>{{ log.created|date:"Y-m-d H:i:s" }}</td></tr>
+    </tbody>
+  </table>
+</div>
+
+{% if log.ripe_response %}
+<div class="card mb-3">
+  <div class="card-header"><h5 class="card-title mb-0">RIPE Response</h5></div>
+  <div class="card-body">
+    <pre class="mb-0">{{ log.ripe_response }}</pre>
+  </div>
+</div>
+{% endif %}
+
+{% if log.error_message %}
+<div class="card border-danger">
+  <div class="card-header bg-danger text-white"><h5 class="card-title mb-0">Error</h5></div>
+  <div class="card-body">
+    <pre class="mb-0 text-danger">{{ log.error_message }}</pre>
+  </div>
+</div>
+{% endif %}
+{% endblock %}

@@ -1,184 +1,158 @@
-# ripe-updater
+# netbox-ripe-sync
 
-ripe-updater is an API wrapper tool between [NetBox](https://github.com/netbox-community/netbox/) and [RIPE-DB](https://apps.db.ripe.net/), to keep INETNUM and INET6NUM objects updated. Initial work has started at [SysEleven](https://syseleven.de) and development continued at [Inter.link](https://inter.link).
+A **native NetBox 4.x plugin** that automatically synchronises inetnum and inet6num
+objects to the RIPE Database whenever a prefix is created, updated, or deleted in
+NetBox.
 
-ripe-updater is a [Flask](https://flask.palletsprojects.com/) based Python app. The code is available on [GitHub](https://github.com/interdotlink/ripe-updater/)
+> **Migration note:** This replaces the legacy `ripe-updater` Flask sidecar.
+> The original code is kept in `ripeupdater/` for reference only.
+> Key changes: RIPE MNT-password auth → API key auth; standalone service → native
+> NetBox plugin; pynetbox webhooks → Django ORM signals.
+
+---
 
 ## Features
-* Using NetBox Webhooks on Prefix updates
-* Templates for RIPE-DB attributes
-* Backups of overwritten/deleted objects (stored in S3)
-* Email reporting
-* handling of overlapping INET(6)NUM objects
 
-## Deployment
-### Requirements
-* NetBox 2.4 or later
-* Python 3.8 or later
+- Automatic create / update / delete driven by NetBox prefix save/delete signals
+- RIPE Database API key authentication (replaces deprecated MD5 password)
+- IPv4 (inetnum) and IPv6 (inet6num) support
+- File-based JSON template system (same format as legacy ripe-updater)
+- Overlap detection and automatic resolution
+- Per-prefix sync log visible in the NetBox UI
+- "Sync Now" button on the prefix detail page
+- Optional S3 backup of objects before modification
+- Management command to create required custom fields
+- REST API endpoint for programmatic sync triggers
 
-### Getting started
-These steps are mandatory to get ripe-updater up and running.
-1. deploy ripe-updater
-1. configure ripe-updater
-1. configure NetBox
-1. setup templates
+---
 
-### Containerized (recommended)
-Copy and edit `.env`
-```
-cp .env.example .env
-vi .env
-docker run \
-  -p 8000:80 \
-  -v "/home/user/ripe-updater/templates:/opt/ripeupdater/templates:ro" \
-  --env-file .env \
-  interdotlink/ripe-updater
-```
+## Requirements
 
-#### docker-compose
-Copy and edit `docker-compose.override.yml`
-```
-cp docker-compose.override.example.yml docker-compose.override.yml
-docker-compose up -d
+- NetBox ≥ 4.0
+- Python ≥ 3.10
+- `iso3166` Python package
+- RQ worker running (`python manage.py rqworker default`)
+- RIPE NCC Access account with a Database API key
+
+---
+
+## Installation
+
+```bash
+pip install netbox-ripe-sync
+# or for development:
+pip install -e /path/to/netbox_ripe_sync
 ```
 
-### Installation on Linux
-Edit `ripeupdater/configuration.py`.
+Add to NetBox's `configuration.py`:
+
+```python
+PLUGINS = ['netbox_ripe_sync']
+
+PLUGINS_CONFIG = {
+    'netbox_ripe_sync': {
+        # --- Required ---
+        'ripe_api_key_id':     'YOUR_KEY_ID',      # from LIR Portal → API Keys
+        'ripe_api_key_secret': 'YOUR_KEY_SECRET',
+        'templates_dir':       '/opt/netbox/ripe_templates',
+
+        # --- Recommended ---
+        'ripe_db':             'RIPE',   # 'TEST' (default) or 'RIPE'
+        'default_country':     'DE',     # ISO 3166-1 alpha-2 fallback
+
+        # --- Prefix size limits ---
+        'smallest_prefix_v4':  31,       # prefixes larger than /31 are silently skipped
+        'smallest_prefix_v6':  127,
+
+        # --- TEST database overrides ---
+        'ripe_test_mnt':       'TEST-DBM-MNT',
+        'ripe_test_org':       'ORG-EIPB1-TEST',
+        'ripe_test_person':    'AA1-TEST',
+        'ripe_test_status_v4': 'ALLOCATED PA',
+        'ripe_test_status_v6': 'ALLOCATED PA',
+
+        # --- Optional S3 backup ---
+        's3_backup_enabled':   False,
+        's3_endpoint_url':     None,
+        's3_access_key':       None,
+        's3_secret_key':       None,
+        's3_bucket':           None,
+    }
+}
 ```
-pip install -r requirements.txt
-python -m gunicorn -b :80 -w 2 ripeupdater.main:app
+
+Run migrations:
+
+```bash
+python manage.py migrate netbox_ripe_sync
 ```
 
-### Note for production deployments
+Create the required custom fields:
 
-For production use it is recommended, to setup a reverse proxy e.g. Nginx in front of the ripe-updater and add an SSL certificate, e.g. letsencrypt.
+```bash
+python manage.py ripe_sync_setup
+```
 
-## Configuration
-Configuration is set via environment variables, but you can also edit `ripeupdater/configuration.py`.
+---
 
-| parameter | values | default | description |
+## RIPE API Key
+
+Generate an API key in the [RIPE LIR Portal](https://my.ripe.net) under
+**My Account → API Keys → Create a new Database key**.  The key is displayed
+only once; save both the Key ID and the key secret.
+
+The plugin authenticates using HTTP Basic Auth:
+
+```http
+Authorization: Basic base64(key_id:key_secret)
+```
+
+---
+
+## Custom Fields
+
+| Field | Model | Type | Purpose |
 | --- | --- | --- | --- |
-| DEBUG | yes/no | no | enables verbose logging |
-| MAIL_REPORT | yes/no | no | enables email-reporting |
-| SMTP | url | 127.0.0.1 | url or ip of smtp server |
-| SMTP_STARTTLS | yes/no | no | use STARTTLS when connecting to smtp server |
-| SENDER_MAIL | email | - | sender mail of email-reports |
-| RECIPIENT_MAIL | email | - | receiver of email-reports |
-| UPDATE_TOKEN | string | - | if set, each netbox webhook must contain this tokes as Authorisation header |
-| NETBOX_URL | url | - | url of your netbox instance |
-| NETBOX_TOKEN | string | - | netbox token, which can read prefixes, aggregates, regions and sites |
-| DEFAULT_COUNTRY | ISO3166-II country | - | default country if none could be determined, e.g. DE or NL |
-| TEMPLATES_DIR | path | /opt/ripeupdater/templates | location of templates |
-| RIPE_MNT_PASSWORD | string | - | ripe maintainer password with write permissions to your INET(6)NUM objects |
-| RIPE_DB | RIPE/TEST | TEST | which ripe-db to use |
-| RIPE_TEST_MNT | string | TEST-DBM-MNT | which maintainer to use in the TEST database, as your maintainer may not be present |
-| RIPE_TEST_ORG | string | ORG-EIPB1-TEST | which organisation to use in the TEST database, as your organisation may not be present |
-| RIPE_TEST_PERSON | string | AA1-TEST | which person to use in the TEST database, as your person may not be present |
-| RIPE_TEST_STATUS_V4 | string | ALLOCATED PA | which status to use in the TEST database, as your status may not be able to be set. Your parent INETNUM object, with your MNT-LOWER attribute set to your maintainer may be missing.  |
-| RIPE_TEST_STATUS_V6 | string | ALLOCATED PA | which status to use in the TEST database, as your status may not be able to be set. Your parent INET6NUM object, with your MNT-LOWER attribute set to your maintainer may be missing. |
-| SMALLEST_PREFIX_V4 | 0-32 | 31 | prefix length bigger than this limit will not be handled |
-| SMALLEST_PREFIX_V6 | 0-128 | 127 | prefix length bigger than this limit will not be handled |
-| S3_BACKUP | yes/no | no | enable or disable S3 backups |
-| S3_ENDPOINT_URL | url | - | specify url of your s3 endpoint |
-| S3_ACCESS_KEY | string | - | access key to your s3 storage |
-| S3_SECRET_ACCESS_KEY | string | - | secret access key to your s3 storage |
-| S3_BUCKET | string | - | bucket to store backups in |
+| `ripe_report` | `ipam.Prefix` | Boolean | Enable RIPE sync for this prefix |
+| `ripe_template` | `ipam.Prefix` | Text | Template key from `templates.json` |
+| `lir` | `ipam.Aggregate` | Text | LIR slug, maps to RIPE org via `lir_org.json` |
 
-### NetBox configuration
-You'll need to add three custom fields to NetBox and data needs to be structured in a specific way.
+---
 
-#### custom field - lir
-* Name: `lir`
-* Label: LIR
-* Assigned Models: ipam -> aggregates
-* Type: Selection
-* Required: yes
-* Choices: ***all LIRs you are responsible for***
-* Description: RIPE Local Internet Registry
+## Template Files
 
-#### custom field - ripe_report
-* Name: `ripe_report`
-* Label: RIPE Report
-* Assigned Models: ipam -> prefixes
-* Type: Boolean
-* Required: no
-* Default: false
-* Description: should this prefix be in RIPE-DB
+Place all template files in `templates_dir`:
 
-#### custom field - ripe_template
-* Name: `ripe_template`
-* Label: RIPE Template
-* Assigned Models: ipam -> prefixes
-* Type: Selection
-* Required: no
-* Choices: ***all templates you have created***
-
-#### region - country
-Your sites need to have a country as a parent region found in [iso3166.countries_by_name](https://github.com/deactivated/python-iso3166)
-
-#### Webhook
-add a webhook to NetBox:
-* Name: `ripe-updater`
-* Enabled: yes
-* Events: Create, Update, Delete
-* HTTP Request
-  * HTTP Method: POST
-  * Payload URL: http(s)://your-ripe-updater-host/update
-  * HTTP Content Type: application/json
-* Assigned Models: ipam | prefix
-* Additional Headers - ***if you have set a token in ripe-updater config, set it here***
-  * `Authorisation: Token YOURTOKEN`
-* SSL - enable if you have a valid SSL Certificate for your ripe-updater
-
-## Templates
-Templates are devided into three components.
-1. `lir_org.json` - a list of LIRs you are responsible for, each mapped to a organisation object.
-1. `base_something.json` - a base template with INET(6)NUM attributes. E.g. you have one for yourself and one for each customer which needs to have different attributes (e.g. abuse-c) in RIPE-DB.
-1. `templates.json` - a list of templates. These must be also added to NetBox custom field choices of ripe_template. Each mapped to a base template.
-
-> With the provided example .env file you should be able to test your templates in the TEST database.
-
-### setup list of LIRs
-* copy and edit lir_org.json `cp templates/lir_org.example.json templates/lir_org.json`
-* Add each LIR you are responsible for to an organisation object like `"de.examplelir1": "ORG-EIPB1-TEST",`
-
-### setup your templates
-* You should create a template for each case, where you want to document different attributes to your INET(6)NUM objects. E.g. like a different `abuse-c`
-* You can take `templates/base_mycompany.example.json` as a starting point.
-* You must include an **empty** statement: `{"org": ""},` to autofill organisation attributes from your lir_org list.
-
-### setup list of templates
-* Copy and edit templates.json `cp templates/templates.example.json templates/templates.json`
-* Add your templates you are planning to use like
-    ```
-            "CLOUD-POOL": {"attributes": [
-            {"descr": "MyCompany Cloud Pool"}
-        ],
-            "inherit": "base_mycompany.json"
-        },
-    ```
-
-## Backups
-If you have enabled and configured a S3 backup storage, you can browse the json representation of deleted or overwritten objects at `http(s)://your-ripe-updater-host/backups`.
-To restore a backup manually, you can post the json file to the RIPE database:
-```
-curl -X POST -H 'Content-Type: application/json' --data @prefix.json 'https://rest.db.ripe.net/ripe/inetnum?password=RIPE_MNT_PASSWORD'
+```text
+templates_dir/
+├── templates.json          ← index of templates
+├── lir_org.json            ← LIR slug → RIPE org ID
+├── base_mycompany.json     ← base attributes (admin-c, mnt-by, source, …)
+└── base_mycustomer1.json   ← alternate base for different abuse-c etc.
 ```
 
-## Development
-To run the unit tests, run
+Formats are identical to the legacy ripe-updater — copy your existing files
+unchanged.
 
-```
-pip install tox
-tox
-```
+---
 
-## Known limitations
-* Having Ripe-Report set for parent and it's child-prefixes will fail, as you can only have one level of prefixes below your aggregates in RIPE-DB.
-  * ***Workaround***: Disable Ripe-Reporting of the parent or child prefixes.
-* Extending a prefix in NetBox (e.g. /27 to /26) will fail, as there is not deterministic way of detecting this.
-  * ***Workaround***: Disable Ripe-Reporting of this prefix, extend prefix size, reenable Ripe-Reporting
+## Region → Country Mapping
 
-## Initial Authors
-* Mohamad Mouselli (https://github.com/mmouselli)
-* Christian Harendt (christian at inter.link)
+The plugin walks a prefix's Site → Region hierarchy looking for an ISO 3166-1
+alpha-2 country code.  Either:
+
+- Name a region with a two-letter slug (`de`, `nl`, `us`) — matched as alpha-2, or
+- Name a region after a full country name (`germany`, `netherlands`) — matched
+  against `iso3166.countries_by_name`.
+
+If no match is found, `default_country` is used.
+
+---
+
+## Known Limitations
+
+- A prefix and its child prefixes cannot both have `ripe_report = True` — RIPE
+  only allows one level below an aggregate. Workaround: disable `ripe_report`
+  on either the parent or the children.
+- Widening a prefix (e.g. `/27` → `/26`) requires disabling `ripe_report`,
+  resizing, then re-enabling — the same limitation as the legacy tool.
