@@ -7,11 +7,6 @@ A **native NetBox 4.x plugin** that:
 2. **Imports resources** from the RIPE LIR Portal My Resources API — pulling
    your ASNs, allocations, and assignments directly into NetBox.
 
-> **Migration note:** This replaces the legacy `ripe-updater` Flask sidecar.
-> The original code is kept in `ripeupdater/` for reference only.
-> Key changes: RIPE MNT-password auth → API key auth; standalone service →
-> native NetBox plugin; pynetbox webhooks → Django ORM signals.
-
 ---
 
 ## Features

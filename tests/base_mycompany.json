@@ -1,9 +1,0 @@
-{ "attributes": [
-    {"org": ""},
-    {"remarks": "Managed by ripeupdater"},
-    {"admin-c": "AA1-TEST"},
-    {"tech-c": "AA1-TEST"},
-    {"notify": "noc@example.com"},
-    {"mnt-by": "TEST-DBM-MNT"},
-    {"source": "TEST"}
-]}
