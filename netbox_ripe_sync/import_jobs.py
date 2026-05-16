@@ -53,13 +53,21 @@ def run_my_resources_import(run_id, dry_run=False, resource_types=None, triggere
             # visible in the run detail page without needing log access.
             raw_asns = resources.get('asns', [])
             diag_lines = [
-                f'API resource counts: { {k: len(v) for k, v in resources.items()} }',
-                f'Raw ASN items returned: {len(raw_asns)}',
+                f'Resource counts: { {k: len(v) for k, v in resources.items()} }',
+                f'Raw ASN items after expansion: {len(raw_asns)}',
             ]
             if raw_asns:
                 first = raw_asns[0]
                 diag_lines.append(f'First ASN item keys: {list(first.keys())}')
                 diag_lines.append(f'First ASN item: {json.dumps(first, default=str)}')
+            else:
+                # Call the endpoint again to show the raw response body
+                try:
+                    raw_resp = client._get('/asn')
+                    diag_lines.append(f'Raw /asn response keys: {list(raw_resp.keys())}')
+                    diag_lines.append(f'Raw /asn response: {json.dumps(raw_resp, default=str)[:500]}')
+                except Exception as exc:
+                    diag_lines.append(f'Raw /asn fetch error: {exc}')
             run.error_message = '\n'.join(diag_lines)
             run.save(update_fields=['error_message'])
 
