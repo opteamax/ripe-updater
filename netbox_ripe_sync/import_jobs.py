@@ -48,6 +48,21 @@ def run_my_resources_import(run_id, dry_run=False, resource_types=None, triggere
             f'errors={stats.total_errors()}'
         )
 
+        if dry_run:
+            # Store a diagnostic snapshot so the API response structure is
+            # visible in the run detail page without needing log access.
+            raw_asns = resources.get('asns', [])
+            diag_lines = [
+                f'API resource counts: { {k: len(v) for k, v in resources.items()} }',
+                f'Raw ASN items returned: {len(raw_asns)}',
+            ]
+            if raw_asns:
+                first = raw_asns[0]
+                diag_lines.append(f'First ASN item keys: {list(first.keys())}')
+                diag_lines.append(f'First ASN item: {json.dumps(first, default=str)}')
+            run.error_message = '\n'.join(diag_lines)
+            run.save(update_fields=['error_message'])
+
     except MyResourcesError as exc:
         logger.error(f'My Resources import failed (run={run_id}): {exc}')
         run.status = RipeImportRun.STATUS_FAILED
