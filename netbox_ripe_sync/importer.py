@@ -121,9 +121,12 @@ class ResourceImporter:
     # ------------------------------------------------------------------
 
     def _safe_import_asn(self, data):
-        raw = data.get('asn') or data.get('asnNumber') or data.get('asnId')
-        asn_int = MyResourcesClient.parse_asn_number(raw)
-        identifier = f'AS{asn_int}' if asn_int else repr(raw)
+        # _asn_int is set by MyResourcesClient.get_asns() after range expansion
+        asn_int = data.get('_asn_int') or MyResourcesClient.parse_asn_number(
+            data.get('asn') or data.get('asnNumber') or data.get('asnId')
+            or data.get('startAsn')
+        )
+        identifier = f'AS{asn_int}' if asn_int else repr(data)
         try:
             result = self._import_asn(asn_int, data)
             logger.debug(f'ASN {identifier}: {result}')

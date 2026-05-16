@@ -40,10 +40,34 @@ class MyResourcesClient:
     # ------------------------------------------------------------------
 
     def get_asns(self) -> list[dict]:
-        """Return list of ASN dicts: [{asn, registrationDate, status, ...}, ...]"""
+        """Return list of ASN dicts from the My Resources API.
+
+        The API returns ASN ranges (startAsn/endAsn).  Ranges containing more
+        than one ASN are expanded so callers always get one dict per ASN.
+        """
         data = self._get('/asn')
-        # API may return 'asns' or 'asnAllocations' depending on version
-        return data.get('asns') or data.get('asnAllocations') or []
+        logger.debug(f'My Resources /asn raw response keys: {list(data.keys())}')
+        items = data.get('asns') or data.get('asnAllocations') or []
+        logger.debug(f'My Resources /asn: {len(items)} raw items')
+        if items:
+            logger.debug(f'My Resources /asn first item keys: {list(items[0].keys())}')
+
+        expanded = []
+        for item in items:
+            start = self.parse_asn_number(
+                item.get('startAsn') or item.get('asn') or item.get('asnNumber') or item.get('asnId')
+            )
+            end = self.parse_asn_number(item.get('endAsn')) or start
+            if start is None:
+                logger.warning(f'My Resources /asn: cannot parse ASN from item {item!r}')
+                continue
+            for asn_num in range(start, end + 1):
+                entry = dict(item)
+                entry['_asn_int'] = asn_num
+                expanded.append(entry)
+
+        logger.debug(f'My Resources /asn: {len(expanded)} ASNs after range expansion')
+        return expanded
 
     def get_ipv4_allocations(self) -> list[dict]:
         data = self._get('/ipv4/allocations')
