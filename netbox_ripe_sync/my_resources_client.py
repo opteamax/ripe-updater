@@ -47,7 +47,12 @@ class MyResourcesClient:
         """
         data = self._get('/asn')
         logger.info(f'My Resources /asn raw response keys: {list(data.keys())}')
-        items = data.get('asns') or data.get('asnAllocations') or []
+        items = (
+            data.get('asnResources')        # actual key as of 2026
+            or data.get('asns')
+            or data.get('asnAllocations')
+            or []
+        )
         logger.info(f'My Resources /asn: {len(items)} raw items')
         if items:
             logger.info(f'My Resources /asn first item keys: {list(items[0].keys())}')
@@ -55,7 +60,11 @@ class MyResourcesClient:
         expanded = []
         for item in items:
             start = self.parse_asn_number(
-                item.get('startAsn') or item.get('asn') or item.get('asnNumber') or item.get('asnId')
+                item.get('number')          # "48200" string in asnResources items
+                or item.get('startAsn')
+                or item.get('asn')
+                or item.get('asnNumber')
+                or item.get('asnId')
             )
             end = self.parse_asn_number(item.get('endAsn')) or start
             if start is None:
