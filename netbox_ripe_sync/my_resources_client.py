@@ -46,11 +46,11 @@ class MyResourcesClient:
         than one ASN are expanded so callers always get one dict per ASN.
         """
         data = self._get('/asn')
-        logger.debug(f'My Resources /asn raw response keys: {list(data.keys())}')
+        logger.info(f'My Resources /asn raw response keys: {list(data.keys())}')
         items = data.get('asns') or data.get('asnAllocations') or []
-        logger.debug(f'My Resources /asn: {len(items)} raw items')
+        logger.info(f'My Resources /asn: {len(items)} raw items')
         if items:
-            logger.debug(f'My Resources /asn first item keys: {list(items[0].keys())}')
+            logger.info(f'My Resources /asn first item keys: {list(items[0].keys())}')
 
         expanded = []
         for item in items:
@@ -66,7 +66,7 @@ class MyResourcesClient:
                 entry['_asn_int'] = asn_num
                 expanded.append(entry)
 
-        logger.debug(f'My Resources /asn: {len(expanded)} ASNs after range expansion')
+        logger.info(f'My Resources /asn: {len(expanded)} ASNs after range expansion')
         return expanded
 
     def get_ipv4_allocations(self) -> list[dict]:
@@ -108,7 +108,7 @@ class MyResourcesClient:
         for key, fetcher in fetchers.items():
             try:
                 results[key] = fetcher()
-                logger.debug(f'My Resources: fetched {len(results[key])} {key}')
+                logger.info(f'My Resources: fetched {len(results[key])} {key}')
             except MyResourcesError as exc:
                 logger.warning(f'My Resources: skipping {key} — {exc}')
                 results[key] = []
