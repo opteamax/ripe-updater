@@ -1,6 +1,8 @@
+from typing import Any
+
 from django.conf import settings
 
-_DEFAULTS = {
+_DEFAULTS: dict[str, Any] = {
     # RIPE Database REST API (inetnum/inet6num sync)
     'ripe_db': 'TEST',
     'ripe_api_key_id': None,
@@ -24,6 +26,6 @@ _DEFAULTS = {
 }
 
 
-def get_config(key):
+def get_config(key: str) -> Any:
     plugin_config = settings.PLUGINS_CONFIG.get('netbox_ripe_sync', {})
     return plugin_config.get(key, _DEFAULTS.get(key))

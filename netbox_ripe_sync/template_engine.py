@@ -1,6 +1,6 @@
 import json
 import logging
-import os
+from pathlib import Path
 
 from .config import get_config
 from .exceptions import TemplateNotFound
@@ -15,11 +15,10 @@ _MNT_ATTRS = {'mnt-by', 'mnt-ref', 'mnt-lower', 'mnt-domains', 'mnt-routes', 'mn
 _CONTACT_ATTRS = {'admin-c', 'tech-c', 'abuse-c'}
 
 
-def _load_json(path):
-    if not os.path.exists(path):
+def _load_json(path: Path) -> dict:
+    if not path.exists():
         raise RuntimeError(f'Template file not found: {path}')
-    with open(path) as fh:
-        return json.load(fh)
+    return json.loads(path.read_text(encoding='utf-8'))
 
 
 class TemplateEngine:
@@ -31,14 +30,21 @@ class TemplateEngine:
         lir_org.json            — LIR slug -> RIPE org ID mapping
     """
 
-    def __init__(self):
-        self.templates_dir = get_config('templates_dir')
+    def __init__(self) -> None:
+        self.templates_dir = Path(get_config('templates_dir'))
 
     # ------------------------------------------------------------------
     # Public
     # ------------------------------------------------------------------
 
-    def generate_object(self, prefix_str, template_name, org, country, status):
+    def generate_object(
+        self,
+        prefix_str: str,
+        template_name: str,
+        org: str | None,
+        country: str | None,
+        status: str,
+    ) -> dict:
         """Return the RIPE REST API JSON body for an inetnum/inet6num object."""
         ripe_db = get_config('ripe_db')
         objecttype = 'inet6num' if is_v6(prefix_str) else 'inetnum'
@@ -117,8 +123,8 @@ class TemplateEngine:
     # Private helpers
     # ------------------------------------------------------------------
 
-    def _read_local_template(self, template_name):
-        path = os.path.join(self.templates_dir, TEMPLATES_FILE)
+    def _read_local_template(self, template_name: str) -> dict:
+        path = self.templates_dir / TEMPLATES_FILE
         data = _load_json(path)
         tpl = data.get('templates', {}).get(template_name)
         if tpl is None:
@@ -128,12 +134,12 @@ class TemplateEngine:
             )
         return tpl
 
-    def _read_master_template(self, inherit_filename):
-        path = os.path.join(self.templates_dir, inherit_filename)
+    def _read_master_template(self, inherit_filename: str) -> list:
+        path = self.templates_dir / inherit_filename
         data = _load_json(path)
         return data.get('attributes', [])
 
-    def _apply_test_overrides(self, attrs, objecttype):
+    def _apply_test_overrides(self, attrs: list, objecttype: str) -> list:
         """Replace sensitive values with TEST-database-safe placeholders."""
         test_mnt = get_config('ripe_test_mnt')
         test_org = get_config('ripe_test_org')
@@ -143,7 +149,7 @@ class TemplateEngine:
             if objecttype == 'inet6num'
             else get_config('ripe_test_status_v4')
         )
-        ripe_db = get_config('ripe_db')  # 'TEST'
+        ripe_db = get_config('ripe_db')
 
         result = []
         for k, v in attrs:
@@ -162,7 +168,7 @@ class TemplateEngine:
         return result
 
     @staticmethod
-    def _wrap_ripe_json(attrs, ripe_db):
+    def _wrap_ripe_json(attrs: list, ripe_db: str) -> dict:
         return {
             'objects': {
                 'object': [{

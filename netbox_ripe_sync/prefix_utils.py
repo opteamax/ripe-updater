@@ -4,11 +4,11 @@ from .config import get_config
 from .exceptions import NotRoutablePrefix, PrefixTooSmall
 
 
-def is_v6(prefix_str):
+def is_v6(prefix_str: str) -> bool:
     return ip_network(prefix_str, strict=False).version == 6
 
 
-def format_cidr(prefix_str):
+def format_cidr(prefix_str: str) -> str:
     """Convert CIDR notation to RIPE range notation for IPv4.
 
     '192.0.2.0/24'  ->  '192.0.2.0 - 192.0.2.255'
@@ -17,7 +17,7 @@ def format_cidr(prefix_str):
     return f'{net.network_address} - {net.broadcast_address}'
 
 
-def validate_prefix(prefix_str):
+def validate_prefix(prefix_str: str) -> None:
     net = ip_network(prefix_str, strict=False)
 
     if is_v6(prefix_str):
@@ -38,7 +38,7 @@ def validate_prefix(prefix_str):
             raise NotRoutablePrefix(f'{prefix_str} is not a globally routable IPv4 prefix')
 
 
-def find(path, obj):
+def find(path: str, obj: dict) -> object:
     """Navigate a nested dict using a dotted path string.
 
     find('objects.object', {'objects': {'object': [1, 2]}}) -> [1, 2]
@@ -50,13 +50,13 @@ def find(path, obj):
     return obj
 
 
-def flatten_ripe_attributes(ripe_object):
+def flatten_ripe_attributes(ripe_object: dict) -> list[tuple[str, str]]:
     """Return [(name, value), ...] from a single RIPE REST API object dict."""
     attrs = find('attributes.attribute', ripe_object) or []
     return [(a.get('name', ''), a.get('value', '')) for a in attrs]
 
 
-def format_ripe_object(ripe_object, line_prefix=''):
+def format_ripe_object(ripe_object: dict, line_prefix: str = '') -> str:
     """Return a human-readable text representation of a RIPE object."""
     if not ripe_object:
         return ''

@@ -1,5 +1,0 @@
-# Runtime dependencies for netbox_ripe_sync
-# NetBox itself brings in django, djangorestframework, django-tables2,
-# django-rq, and requests, so only list what those don't cover.
-iso3166>=2.0
-boto3>=1.24  # optional: only needed when s3_backup_enabled = True

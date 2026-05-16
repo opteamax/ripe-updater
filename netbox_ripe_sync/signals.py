@@ -1,9 +1,8 @@
 import json
 import logging
-import os
+from pathlib import Path
 
 from django.db.models.signals import post_delete, post_save
-from django.dispatch import receiver
 
 from .models import RipeSyncLog
 
@@ -114,8 +113,8 @@ def _get_org(prefix_str):
     if not templates_dir:
         return None
 
-    lir_org_file = os.path.join(templates_dir, 'lir_org.json')
-    if not os.path.exists(lir_org_file):
+    lir_org_file = Path(templates_dir) / 'lir_org.json'
+    if not lir_org_file.exists():
         logger.debug(f'lir_org.json not found at {lir_org_file}; org will be taken from template')
         return None
 
@@ -137,8 +136,7 @@ def _get_org(prefix_str):
             logger.debug(f'lir custom field is empty on aggregate for {prefix_str}')
             return None
 
-        with open(lir_org_file) as fh:
-            data = json.load(fh)
+        data = json.loads(lir_org_file.read_text(encoding='utf-8'))
 
         org = data.get('templates', {}).get('lir_org', {}).get(lir)
         if org is None:

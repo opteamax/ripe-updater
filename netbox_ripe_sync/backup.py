@@ -8,7 +8,7 @@ logger = logging.getLogger('netbox.plugins.ripe_sync')
 class BackupManager:
     """Stores pre-modification snapshots of RIPE objects in S3."""
 
-    def __init__(self):
+    def __init__(self) -> None:
         self._s3 = None
 
         if get_config('s3_backup_enabled'):
@@ -27,14 +27,13 @@ class BackupManager:
                 except self._s3.exceptions.BucketAlreadyOwnedByYou:
                     pass
                 except Exception as exc:
-                    # BucketAlreadyExists is also acceptable
                     if 'BucketAlreadyExists' not in str(exc):
                         raise
             except ImportError:
                 logger.warning('boto3 not installed — S3 backup disabled')
                 self._s3 = None
 
-    def put(self, filename, content):
+    def put(self, filename: str, content: str) -> None:
         if self._s3 is None:
             return
         bucket = get_config('s3_bucket')
@@ -44,7 +43,7 @@ class BackupManager:
         except Exception as exc:
             logger.warning(f'S3 backup failed for {filename}: {exc}')
 
-    def get(self, filename):
+    def get(self, filename: str) -> bytes:
         if self._s3 is None:
             return b''
         try:
@@ -55,11 +54,11 @@ class BackupManager:
             logger.warning(f'S3 get failed for {filename}: {exc}')
             return b''
 
-    def list(self):
+    def list(self) -> list[str]:
         if self._s3 is None:
             return []
         try:
-            resp = self._s3.list_objects(Bucket=get_config('s3_bucket'))
+            resp = self._s3.list_objects_v2(Bucket=get_config('s3_bucket'))
             return [obj['Key'] for obj in resp.get('Contents', [])]
         except Exception as exc:
             logger.warning(f'S3 list failed: {exc}')

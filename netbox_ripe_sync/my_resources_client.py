@@ -26,7 +26,7 @@ class MyResourcesError(RipeSyncException):
 class MyResourcesClient:
     """Fetches all resource types from the RIPE LIR Portal My Resources API."""
 
-    def __init__(self):
+    def __init__(self) -> None:
         self.api_key = get_config('lir_portal_api_key')
         if not self.api_key:
             raise MissingConfig(
@@ -39,33 +39,33 @@ class MyResourcesClient:
     # Public resource fetchers
     # ------------------------------------------------------------------
 
-    def get_asns(self):
+    def get_asns(self) -> list[dict]:
         """Return list of ASN dicts: [{asn, registrationDate, status, ...}, ...]"""
         data = self._get('/asn')
         # API may return 'asns' or 'asnAllocations' depending on version
         return data.get('asns') or data.get('asnAllocations') or []
 
-    def get_ipv4_allocations(self):
+    def get_ipv4_allocations(self) -> list[dict]:
         data = self._get('/ipv4/allocations')
         return data.get('ipv4Allocations') or []
 
-    def get_ipv4_assignments(self):
+    def get_ipv4_assignments(self) -> list[dict]:
         data = self._get('/ipv4/assignments')
         return data.get('ipv4Assignments') or []
 
-    def get_ipv4_legacy(self):
+    def get_ipv4_legacy(self) -> list[dict]:
         data = self._get('/ipv4/erxresources')
         return data.get('ipv4ErxResources') or data.get('erxResources') or []
 
-    def get_ipv6_allocations(self):
+    def get_ipv6_allocations(self) -> list[dict]:
         data = self._get('/ipv6/allocations')
         return data.get('ipv6Allocations') or []
 
-    def get_ipv6_assignments(self):
+    def get_ipv6_assignments(self) -> list[dict]:
         data = self._get('/ipv6/assignments')
         return data.get('ipv6Assignments') or []
 
-    def get_all(self):
+    def get_all(self) -> dict[str, list]:
         """Fetch every resource type in one call.
 
         Returns a dict keyed by resource category.  Any endpoint that returns
@@ -94,7 +94,7 @@ class MyResourcesClient:
     # HTTP helper
     # ------------------------------------------------------------------
 
-    def _get(self, path):
+    def _get(self, path: str) -> dict:
         url = f'{_BASE_URL}{path}?format=JSON'
         logger.debug(f'My Resources GET {url}')
         try:
@@ -129,7 +129,7 @@ class MyResourcesClient:
     # ------------------------------------------------------------------
 
     @staticmethod
-    def parse_asn_number(raw):
+    def parse_asn_number(raw: str | int | None) -> int | None:
         """Return an integer ASN from 'AS12345' or 12345 or '12345'."""
         if raw is None:
             return None

@@ -4,7 +4,7 @@ from .models import RipeSyncLog
 
 
 class PrefixRipeSyncPanel(PluginTemplateExtension):
-    model = 'ipam.prefix'
+    models = ['ipam.prefix']
 
     def right_page(self):
         prefix = self.context['object']
