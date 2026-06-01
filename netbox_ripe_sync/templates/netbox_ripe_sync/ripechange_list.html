@@ -1,0 +1,30 @@
+{% extends 'base/layout.html' %}
+{% load django_tables2 %}
+
+{% block title %}RIPE Pending Changes{% endblock %}
+
+{% block content %}
+<div class="row mb-3">
+  <div class="col">
+    <h1 class="page-header">RIPE Changes</h1>
+  </div>
+</div>
+
+<div class="row mb-2">
+  <div class="col">
+    <div class="btn-group btn-group-sm" role="group">
+      <a href="{% url 'plugins:netbox_ripe_sync:ripechange_list' %}" class="btn btn-outline-secondary {% if not status_filter %}active{% endif %}">All</a>
+      <a href="?status=pending" class="btn btn-outline-warning {% if status_filter == 'pending' %}active{% endif %}">Pending ({{ pending_count }})</a>
+      <a href="?status=pushed" class="btn btn-outline-success {% if status_filter == 'pushed' %}active{% endif %}">Pushed</a>
+      <a href="?status=failed" class="btn btn-outline-danger {% if status_filter == 'failed' %}active{% endif %}">Failed</a>
+      <a href="?status=cancelled" class="btn btn-outline-secondary {% if status_filter == 'cancelled' %}active{% endif %}">Cancelled</a>
+    </div>
+  </div>
+</div>
+
+<div class="card">
+  <div class="card-body p-0">
+    {% render_table table %}
+  </div>
+</div>
+{% endblock %}

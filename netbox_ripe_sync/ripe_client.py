@@ -1,4 +1,3 @@
-import base64
 import json
 import logging
 from ipaddress import ip_address, ip_network, summarize_address_range
@@ -95,15 +94,9 @@ class RipeClient:
     # ------------------------------------------------------------------
 
     def _auth_headers(self):
-        key_id = get_config('ripe_api_key_id')
-        key_secret = get_config('ripe_api_key_secret')
-        if not key_id or not key_secret:
-            raise MissingConfig(
-                'ripe_api_key_id and ripe_api_key_secret must be set in PLUGINS_CONFIG'
-            )
-        token = base64.b64encode(f'{key_id}:{key_secret}'.encode()).decode()
+        from .auth import write_authorization
         return {
-            'Authorization': f'Basic {token}',
+            'Authorization': write_authorization(),
             'Content-Type': 'application/json',
             'Accept': 'application/json; charset=utf-8',
         }

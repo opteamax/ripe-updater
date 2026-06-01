@@ -24,6 +24,7 @@
         <th style="width:20%">Status</th>
         <td><span class="badge bg-{{ run.status_badge }}">{{ run.get_status_display }}</span></td>
       </tr>
+      <tr><th>Source</th><td>{{ run.get_source_display }}</td></tr>
       <tr><th>Dry Run</th><td>{{ run.dry_run|yesno:"Yes,No" }}</td></tr>
       <tr><th>Triggered by</th><td>{{ run.triggered_by|default:"—" }}</td></tr>
       <tr><th>Started</th><td>{{ run.started|date:"Y-m-d H:i:s" }}</td></tr>
@@ -63,6 +64,18 @@
         <td class="text-end">{{ run.prefixes_created }}</td>
         <td class="text-end">{{ run.prefixes_skipped }}</td>
         <td class="text-end {% if run.prefixes_errors %}text-danger fw-bold{% endif %}">{{ run.prefixes_errors }}</td>
+      </tr>
+      <tr>
+        <td>Route objects</td>
+        <td class="text-end">{{ run.routes_created }}</td>
+        <td class="text-end">{{ run.routes_skipped }}</td>
+        <td class="text-end {% if run.routes_errors %}text-danger fw-bold{% endif %}">{{ run.routes_errors }}</td>
+      </tr>
+      <tr>
+        <td>Domain objects</td>
+        <td class="text-end">{{ run.domains_created }}</td>
+        <td class="text-end">{{ run.domains_skipped }}</td>
+        <td class="text-end {% if run.domains_errors %}text-danger fw-bold{% endif %}">{{ run.domains_errors }}</td>
       </tr>
     </tbody>
     <tfoot class="table-group-divider">

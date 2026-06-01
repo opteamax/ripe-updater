@@ -1,16 +1,19 @@
 {% extends 'base/layout.html' %}
 {% load django_tables2 %}
 
-{% block title %}RIPE My Resources Import Runs{% endblock %}
+{% block title %}RIPE Import Runs{% endblock %}
 
 {% block content %}
 <div class="row mb-3">
   <div class="col">
-    <h1 class="page-header">RIPE My Resources Import Runs</h1>
+    <h1 class="page-header">RIPE Import Runs</h1>
   </div>
   <div class="col-auto">
     <button type="button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#triggerImportModal">
-      <i class="mdi mdi-import"></i> Import Now
+      <i class="mdi mdi-import"></i> Import My Resources
+    </button>
+    <button type="button" class="btn btn-success" data-bs-toggle="modal" data-bs-target="#triggerDbImportModal">
+      <i class="mdi mdi-database-import"></i> Import RIPE Database
     </button>
   </div>
 </div>
@@ -81,6 +84,51 @@
         <div class="modal-footer">
           <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
           <button type="submit" class="btn btn-primary">
+            <i class="mdi mdi-play"></i> Start Import
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+
+<!-- Trigger RIPE Database Import Modal -->
+<div class="modal fade" id="triggerDbImportModal" tabindex="-1" aria-labelledby="triggerDbImportModalLabel" aria-hidden="true">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <form method="post" action="{% url 'plugins:netbox_ripe_sync:trigger_db_import' %}">
+        {% csrf_token %}
+        <div class="modal-header">
+          <h5 class="modal-title" id="triggerDbImportModalLabel">Import from RIPE Database</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+        </div>
+        <div class="modal-body">
+          <p class="text-muted">
+            Discovers inetnum, inet6num, route and route6 objects via inverse lookup on the
+            maintainers / organisations configured in <code>ripe_db_maintainers</code> and
+            <code>ripe_db_orgs</code>. Missing IP ranges are created in NetBox.
+          </p>
+          <div class="mb-3 form-check">
+            <input type="checkbox" class="form-check-input" id="db_dry_run" name="dry_run" value="1">
+            <label class="form-check-label" for="db_dry_run">
+              Dry run (preview only — no objects will be created)
+            </label>
+          </div>
+          <div class="mb-3">
+            <label for="object_types" class="form-label">
+              Limit to object types
+              <small class="text-muted">(leave blank for all)</small>
+            </label>
+            <input type="text" class="form-control" id="object_types" name="object_types"
+              placeholder="e.g. inetnum, route">
+            <div class="form-text">
+              Comma-separated subset of: inetnum, inet6num, route, route6, domain
+            </div>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+          <button type="submit" class="btn btn-success">
             <i class="mdi mdi-play"></i> Start Import
           </button>
         </div>

@@ -1,0 +1,102 @@
+{% extends 'base/layout.html' %}
+
+{% block title %}RIPE Change #{{ change.pk }}{% endblock %}
+
+{% block content %}
+<div class="row mb-3">
+  <div class="col">
+    <h1 class="page-header">Change #{{ change.pk }}</h1>
+  </div>
+  <div class="col-auto">
+    <a href="{% url 'plugins:netbox_ripe_sync:ripechange_list' %}" class="btn btn-outline-secondary">
+      <i class="mdi mdi-arrow-left"></i> All Changes
+    </a>
+  </div>
+</div>
+
+<div class="card mb-3">
+  <div class="card-header"><h5 class="card-title mb-0">Details</h5></div>
+  <table class="table table-sm">
+    <tbody>
+      <tr><th style="width:20%">Operation</th><td>{{ change.get_operation_display }}</td></tr>
+      <tr><th>Object type</th><td>{{ change.object_type }}</td></tr>
+      <tr><th>Primary key</th><td><code>{{ change.primary_key }}</code></td></tr>
+      <tr><th>Status</th><td><span class="badge bg-{{ change.status_badge }}">{{ change.get_status_display }}</span></td></tr>
+      <tr><th>Requested by</th><td>{{ change.requested_by|default:"—" }} @ {{ change.requested_at|date:"Y-m-d H:i:s" }}</td></tr>
+      {% if change.pushed_at %}
+      <tr><th>Pushed by</th><td>{{ change.pushed_by|default:"—" }} @ {{ change.pushed_at|date:"Y-m-d H:i:s" }}</td></tr>
+      {% endif %}
+    </tbody>
+  </table>
+</div>
+
+<div class="card mb-3">
+  <div class="card-header"><h5 class="card-title mb-0">Proposed change (diff vs last-known RIPE state)</h5></div>
+  <div class="card-body">
+    {% if diff_lines %}
+    <pre class="mb-0">{% for line in diff_lines %}{% if line|slice:":1" == "+" %}<span class="text-success">{{ line }}</span>{% elif line|slice:":1" == "-" %}<span class="text-danger">{{ line }}</span>{% else %}{{ line }}{% endif %}
+{% endfor %}</pre>
+    {% else %}
+    <p class="text-muted mb-0">No attribute differences recorded.</p>
+    {% endif %}
+  </div>
+</div>
+
+{% if change.error_message %}
+<div class="card mb-3 border-danger">
+  <div class="card-header bg-danger text-white"><h5 class="card-title mb-0">Push error</h5></div>
+  <div class="card-body"><pre class="mb-0 text-danger">{{ change.error_message }}</pre></div>
+</div>
+{% endif %}
+
+{% if change.ripe_response %}
+<div class="card mb-3">
+  <div class="card-header"><h5 class="card-title mb-0">RIPE response</h5></div>
+  <div class="card-body"><pre class="mb-0">{{ change.ripe_response }}</pre></div>
+</div>
+{% endif %}
+
+{% if change.status == 'pending' %}
+<div class="card border-primary">
+  <div class="card-body d-flex gap-2">
+    <button type="button" class="btn btn-success" data-bs-toggle="modal" data-bs-target="#pushModal">
+      <i class="mdi mdi-cloud-upload"></i> Push to RIPE…
+    </button>
+    <form method="post" action="{% url 'plugins:netbox_ripe_sync:ripechange_cancel' pk=change.pk %}">
+      {% csrf_token %}
+      <button type="submit" class="btn btn-outline-secondary">Cancel change</button>
+    </form>
+  </div>
+</div>
+
+<!-- Push confirmation modal -->
+<div class="modal fade" id="pushModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <form method="post" action="{% url 'plugins:netbox_ripe_sync:ripechange_push' pk=change.pk %}">
+        {% csrf_token %}
+        <input type="hidden" name="confirm" value="1">
+        <div class="modal-header">
+          <h5 class="modal-title">Confirm push to RIPE</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+        </div>
+        <div class="modal-body">
+          <p>
+            This will <strong>{{ change.get_operation_display|lower }}</strong>
+            <code>{{ change.object_type }} {{ change.primary_key }}</code>
+            in the <strong>{{ change.object_type }}</strong> RIPE Database.
+          </p>
+          <p class="text-danger mb-0">This action writes to RIPE and cannot be undone from here.</p>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+          <button type="submit" class="btn btn-success">
+            <i class="mdi mdi-cloud-upload"></i> Confirm &amp; push
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+{% endif %}
+{% endblock %}

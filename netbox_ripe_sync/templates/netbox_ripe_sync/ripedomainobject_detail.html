@@ -1,0 +1,61 @@
+{% extends 'base/layout.html' %}
+
+{% block title %}RIPE Domain {{ domain.domain }}{% endblock %}
+
+{% block content %}
+<div class="row mb-3">
+  <div class="col">
+    <h1 class="page-header">{{ domain.domain }}</h1>
+  </div>
+  <div class="col-auto">
+    <a href="{% url 'plugins:netbox_ripe_sync:ripeobject_edit' kind='domain' pk=domain.pk %}" class="btn btn-primary">
+      <i class="mdi mdi-pencil"></i> Edit
+    </a>
+    <form method="post" action="{% url 'plugins:netbox_ripe_sync:ripeobject_delete' kind='domain' pk=domain.pk %}" class="d-inline">
+      {% csrf_token %}
+      <button type="submit" class="btn btn-outline-danger"
+              onclick="return confirm('Queue a deletion of this object from RIPE?');">
+        <i class="mdi mdi-delete"></i> Request delete
+      </button>
+    </form>
+  </div>
+</div>
+
+{% if pending %}
+<div class="alert alert-warning">
+  <strong>{{ pending.count }} pending change(s)</strong> awaiting push to RIPE.
+  {% for c in pending %}
+    <a href="{{ c.get_absolute_url }}" class="ms-2">#{{ c.pk }} ({{ c.get_operation_display }})</a>
+  {% endfor %}
+</div>
+{% endif %}
+
+<div class="card mb-3">
+  <div class="card-header"><h5 class="card-title mb-0">Details</h5></div>
+  <table class="table table-sm">
+    <tbody>
+      <tr><th style="width:20%">Domain</th><td>{{ domain.domain }}</td></tr>
+      <tr><th>Admin-c</th><td>{{ domain.admin_c|default:"—" }}</td></tr>
+      <tr><th>Tech-c</th><td>{{ domain.tech_c|default:"—" }}</td></tr>
+      <tr><th>Zone-c</th><td>{{ domain.zone_c|default:"—" }}</td></tr>
+      <tr>
+        <th>Nameservers</th>
+        <td>
+          {% for ns in domain.nameserver_list %}{{ ns }}<br>{% empty %}—{% endfor %}
+        </td>
+      </tr>
+      <tr><th>Maintainer</th><td>{{ domain.maintainer|default:"—" }}</td></tr>
+      <tr><th>Source</th><td>{{ domain.source|default:"—" }}</td></tr>
+      <tr><th>State</th><td><span class="badge bg-{{ domain.status_badge }}">{{ domain.get_local_status_display }}</span></td></tr>
+      <tr><th>Imported</th><td>{{ domain.created|date:"Y-m-d H:i:s" }}</td></tr>
+    </tbody>
+  </table>
+</div>
+
+{% if domain.description %}
+<div class="card mb-3">
+  <div class="card-header"><h5 class="card-title mb-0">Description</h5></div>
+  <div class="card-body"><pre class="mb-0">{{ domain.description }}</pre></div>
+</div>
+{% endif %}
+{% endblock %}

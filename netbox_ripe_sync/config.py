@@ -7,8 +7,18 @@ _DEFAULTS: dict[str, Any] = {
     'ripe_db': 'TEST',
     'ripe_api_key_id': None,
     'ripe_api_key_secret': None,
+    # RIPE Database API key for *write* operations (create/modify/delete).
+    # Generated at https://apps.db.ripe.net/db-web-ui/api-keys and linked to the
+    # maintainer via auth: SSO. Accepts 'keyId:password', a base64 blob, or the
+    # full 'Basic <base64>' header value.
+    'ripe_whois_api_token': None,
     # LIR Portal My Resources API (resource import)
     'lir_portal_api_key': None,
+    # RIPE Database inverse-lookup import (inetnum/inet6num/route/route6)
+    # Lists of maintainer (mnt-by) names and/or organisation (org) ids whose
+    # objects should be discovered and imported from the RIPE Database.
+    'ripe_db_maintainers': [],
+    'ripe_db_orgs': [],
     'templates_dir': '/opt/netbox/ripe_templates',
     'smallest_prefix_v4': 31,
     'smallest_prefix_v6': 127,

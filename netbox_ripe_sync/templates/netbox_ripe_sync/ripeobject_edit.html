@@ -1,0 +1,36 @@
+{% extends 'base/layout.html' %}
+
+{% block title %}Edit {{ obj }}{% endblock %}
+
+{% block content %}
+<div class="row mb-3">
+  <div class="col">
+    <h1 class="page-header">Edit {{ obj }}</h1>
+    <p class="text-muted">
+      Saving records a <strong>pending change</strong> stored locally in NetBox.
+      Nothing is sent to RIPE until you review and confirm the push.
+    </p>
+  </div>
+</div>
+
+<div class="card">
+  <div class="card-body">
+    <form method="post">
+      {% csrf_token %}
+      {% for field in form %}
+      <div class="mb-3">
+        <label for="{{ field.id_for_label }}" class="form-label">{{ field.label }}</label>
+        {{ field }}
+        {% if field.errors %}<div class="text-danger small">{{ field.errors }}</div>{% endif %}
+      </div>
+      {% endfor %}
+      <div class="d-flex gap-2">
+        <button type="submit" class="btn btn-primary">
+          <i class="mdi mdi-content-save"></i> Queue change
+        </button>
+        <a href="{{ obj.get_absolute_url }}" class="btn btn-outline-secondary">Cancel</a>
+      </div>
+    </form>
+  </div>
+</div>
+{% endblock %}

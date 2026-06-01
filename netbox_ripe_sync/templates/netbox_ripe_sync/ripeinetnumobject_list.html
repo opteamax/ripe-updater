@@ -1,0 +1,22 @@
+{% extends 'base/layout.html' %}
+{% load django_tables2 %}
+
+{% block title %}RIPE Inetnum Objects{% endblock %}
+
+{% block content %}
+<div class="row mb-3">
+  <div class="col">
+    <h1 class="page-header">RIPE Inetnum Objects</h1>
+  </div>
+</div>
+
+<div class="card">
+  <div class="card-header d-flex justify-content-between align-items-center">
+    <h5 class="card-title mb-0">Editable inetnum / inet6num objects</h5>
+    <span class="text-muted small">{{ paginator.count }} record(s)</span>
+  </div>
+  <div class="card-body p-0">
+    {% render_table table %}
+  </div>
+</div>
+{% endblock %}

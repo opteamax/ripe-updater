@@ -66,6 +66,64 @@ def run_my_resources_import(run_id, dry_run=False, resource_types=None, triggere
         raise
 
 
+def run_ripe_db_import(run_id, dry_run=False, object_types=None, triggered_by=None):
+    """Import objects discovered in the RIPE Database via inverse lookups.
+
+    Mirrors :func:`run_my_resources_import` but sources its data from the RIPE
+    Database REST search API rather than the LIR Portal My Resources API.
+
+    Args:
+        run_id:       Primary key of the pre-created RipeImportRun record.
+        dry_run:      When True, no objects are created in NetBox.
+        object_types: List of object types (inetnum/inet6num/route/route6), or None.
+        triggered_by: Username string for audit.
+    """
+    from .models import RipeImportRun
+    from .ripe_db_client import RipeDbSearchClient, RipeDbSearchError
+    from .importer import RipeDbImporter
+
+    try:
+        run = RipeImportRun.objects.get(pk=run_id)
+    except RipeImportRun.DoesNotExist:
+        logger.error(f'RipeImportRun {run_id} not found — aborting job')
+        return
+
+    logger.info(
+        f'Starting RIPE Database import (run={run_id}, dry_run={dry_run}, '
+        f'object_types={object_types}, triggered_by={triggered_by!r})'
+    )
+
+    try:
+        client = RipeDbSearchClient()
+        objects = client.get_all(object_types=object_types)
+
+        importer = RipeDbImporter(dry_run=dry_run, resource_types=object_types)
+        stats = importer.run(objects)
+
+        _update_run(run, stats, status=RipeImportRun.STATUS_SUCCESS)
+        logger.info(
+            f'RIPE Database import complete (run={run_id}): '
+            f'created={stats.total_created()}, skipped={stats.total_skipped()}, '
+            f'errors={stats.total_errors()}'
+        )
+
+    except RipeDbSearchError as exc:
+        logger.error(f'RIPE Database import failed (run={run_id}): {exc}')
+        run.status = RipeImportRun.STATUS_FAILED
+        run.error_message = str(exc)
+        run.finished = datetime.now(tz=timezone.utc)
+        run.save(update_fields=['status', 'error_message', 'finished'])
+        raise
+
+    except Exception as exc:
+        logger.exception(f'Unexpected error in RIPE Database import (run={run_id})')
+        run.status = RipeImportRun.STATUS_FAILED
+        run.error_message = f'{type(exc).__name__}: {exc}'
+        run.finished = datetime.now(tz=timezone.utc)
+        run.save(update_fields=['status', 'error_message', 'finished'])
+        raise
+
+
 def _update_run(run, stats, status):
     from datetime import datetime, timezone
     d = stats.as_dict()

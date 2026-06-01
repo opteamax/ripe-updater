@@ -1,0 +1,66 @@
+{% extends 'base/layout.html' %}
+
+{% block title %}RIPE Inetnum {{ inetnum.prefix }}{% endblock %}
+
+{% block content %}
+<div class="row mb-3">
+  <div class="col">
+    <h1 class="page-header">{{ inetnum.prefix }}</h1>
+  </div>
+  <div class="col-auto">
+    <a href="{% url 'plugins:netbox_ripe_sync:ripeobject_edit' kind='inetnum' pk=inetnum.pk %}" class="btn btn-primary">
+      <i class="mdi mdi-pencil"></i> Edit
+    </a>
+    <form method="post" action="{% url 'plugins:netbox_ripe_sync:ripeobject_delete' kind='inetnum' pk=inetnum.pk %}" class="d-inline">
+      {% csrf_token %}
+      <button type="submit" class="btn btn-outline-danger"
+              onclick="return confirm('Queue a deletion of this object from RIPE?');">
+        <i class="mdi mdi-delete"></i> Request delete
+      </button>
+    </form>
+  </div>
+</div>
+
+{% if pending %}
+<div class="alert alert-warning">
+  <strong>{{ pending.count }} pending change(s)</strong> awaiting push to RIPE.
+  {% for c in pending %}
+    <a href="{{ c.get_absolute_url }}" class="ms-2">#{{ c.pk }} ({{ c.get_operation_display }})</a>
+  {% endfor %}
+</div>
+{% endif %}
+
+<div class="card mb-3">
+  <div class="card-header"><h5 class="card-title mb-0">Details</h5></div>
+  <table class="table table-sm">
+    <tbody>
+      <tr><th style="width:20%">Prefix / range</th><td>{{ inetnum.prefix }}</td></tr>
+      <tr><th>RIPE primary key</th><td><code>{{ inetnum.ripe_primary_key }}</code></td></tr>
+      <tr><th>Netname</th><td>{{ inetnum.netname|default:"—" }}</td></tr>
+      <tr><th>Status</th><td>{{ inetnum.status|default:"—" }}</td></tr>
+      <tr><th>Country</th><td>{{ inetnum.country|default:"—" }}</td></tr>
+      <tr><th>Organisation</th><td>{{ inetnum.org|default:"—" }}</td></tr>
+      <tr><th>Address family</th><td>{% if inetnum.is_ipv6 %}IPv6{% else %}IPv4{% endif %}</td></tr>
+      <tr><th>Maintainer</th><td>{{ inetnum.maintainer|default:"—" }}</td></tr>
+      <tr><th>Source</th><td>{{ inetnum.source|default:"—" }}</td></tr>
+      <tr>
+        <th>NetBox object</th>
+        <td>
+          {% if inetnum.netbox_aggregate %}<a href="{{ inetnum.netbox_aggregate.get_absolute_url }}">{{ inetnum.netbox_aggregate }}</a> (aggregate)
+          {% elif inetnum.netbox_prefix %}<a href="{{ inetnum.netbox_prefix.get_absolute_url }}">{{ inetnum.netbox_prefix }}</a> (prefix)
+          {% else %}—{% endif %}
+        </td>
+      </tr>
+      <tr><th>State</th><td><span class="badge bg-{{ inetnum.status_badge }}">{{ inetnum.get_local_status_display }}</span></td></tr>
+      <tr><th>Imported</th><td>{{ inetnum.created|date:"Y-m-d H:i:s" }}</td></tr>
+    </tbody>
+  </table>
+</div>
+
+{% if inetnum.description %}
+<div class="card mb-3">
+  <div class="card-header"><h5 class="card-title mb-0">Description</h5></div>
+  <div class="card-body"><pre class="mb-0">{{ inetnum.description }}</pre></div>
+</div>
+{% endif %}
+{% endblock %}
