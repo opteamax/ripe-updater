@@ -24,3 +24,8 @@ class MissingConfig(RipeSyncException):
 
 class OverlapConflict(RipeSyncException):
     pass
+
+
+class ResourceMembershipError(RipeSyncException):
+    """Raised when a prefix is not within any RIPE My Resources allocation/assignment."""
+    pass

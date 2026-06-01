@@ -22,6 +22,9 @@ class NetboxRipeSyncConfig(PluginConfig):
         # RIPE Database inverse-lookup import
         'ripe_db_maintainers': [],
         'ripe_db_orgs': [],
+        # My Resources membership safety gate for writes
+        'require_my_resources_membership': True,
+        'my_resources_cache_ttl': 3600,
         'templates_dir': '/opt/netbox/ripe_templates',
         'smallest_prefix_v4': 31,
         'smallest_prefix_v6': 127,

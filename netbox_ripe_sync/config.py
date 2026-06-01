@@ -19,6 +19,13 @@ _DEFAULTS: dict[str, Any] = {
     # objects should be discovered and imported from the RIPE Database.
     'ripe_db_maintainers': [],
     'ripe_db_orgs': [],
+    # Safety gate: before writing a prefix-bearing object to the RIPE Database,
+    # require that the prefix is contained within a RIPE LIR Portal "My Resources"
+    # allocation or assignment. When True, pushes for prefixes outside your
+    # resources are refused. Requires lir_portal_api_key to be set.
+    'require_my_resources_membership': True,
+    # How long (seconds) to cache the My Resources network list used by the check.
+    'my_resources_cache_ttl': 3600,
     'templates_dir': '/opt/netbox/ripe_templates',
     'smallest_prefix_v4': 31,
     'smallest_prefix_v6': 127,

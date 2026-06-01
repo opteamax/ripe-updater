@@ -1,9 +1,20 @@
 # netbox-ripe-sync
 
+> **Origin & history.** This plugin began life as
+> [interdotlink/ripe-updater](https://github.com/interdotlink/ripe-updater/) and
+> is a ground-up rewrite of it. The original targeted older NetBox releases and
+> authenticated to the RIPE Database with the now-deprecated maintainer password.
+> This version is re-implemented as a **native NetBox 4.x plugin** (ORM models,
+> Django signals, RQ jobs, REST API) and updated for the **current RIPE Database
+> API** (API-key authentication). It is maintained at
+> [opteamax/ripe-updater](https://github.com/opteamax/ripe-updater) with the
+> agreement of the original maintainer.
+
 A **native NetBox 4.x plugin** that:
 
-1. **Automatically synchronises** inetnum and inet6num objects to the RIPE
-   Database whenever a prefix is created, updated, or deleted in NetBox.
+1. **Captures** inetnum/inet6num changes whenever a prefix is created, updated,
+   or deleted in NetBox and **queues them as reviewable tasks** — they are
+   pushed to the RIPE Database only after explicit confirmation.
 2. **Imports resources** from the RIPE LIR Portal My Resources API — pulling
    your ASNs, allocations, and assignments directly into NetBox.
 3. **Imports objects from the RIPE Database** by inverse lookup — inetnum,
@@ -17,13 +28,16 @@ A **native NetBox 4.x plugin** that:
 
 ### RIPE Database Sync (outbound)
 
-- Automatic create / update / delete driven by NetBox prefix save/delete signals
+- NetBox prefix create / update / delete is captured by save/delete signals and
+  **queued as a pending change for review** — nothing is pushed to RIPE
+  automatically (see [Prefix Changes & the Review Queue](#prefix-changes--the-review-queue))
+- Membership counter-check: a prefix is only ever written to RIPE if it falls
+  within one of your RIPE *My Resources* allocations or assignments
+- Generates `inetnum` / `inet6num` objects from a file-based JSON template
+  system (same format as legacy ripe-updater)
 - RIPE Database API key authentication (replaces deprecated MD5 password)
-- IPv4 (`inetnum`) and IPv6 (`inet6num`) support
-- File-based JSON template system (same format as legacy ripe-updater)
-- Overlap detection and automatic resolution
 - Per-prefix sync log visible in the NetBox UI
-- "Sync Now" button on the prefix detail page
+- "Sync Now" button on the prefix detail page (queues a change for review)
 - Optional S3 backup of RIPE objects before modification
 
 ### My Resources Import (inbound)
@@ -109,6 +123,12 @@ PLUGINS_CONFIG = {
         # --- RIPE Database import (inbound, inverse lookup) ---
         'ripe_db_maintainers': ['YOUR-MNT'],           # mnt-by names to discover objects for
         'ripe_db_orgs':        ['ORG-XXXX-RIPE'],      # and/or org ids
+
+        # --- Write safety gate ---
+        # Refuse to write a prefix to RIPE unless it is within one of your
+        # My Resources allocations/assignments (requires lir_portal_api_key).
+        'require_my_resources_membership': True,
+        'my_resources_cache_ttl': 3600,                # seconds to cache the resource list
 
         # --- Recommended ---
         'ripe_db':             'RIPE',   # 'TEST' (default) or 'RIPE'
@@ -307,6 +327,56 @@ Pushing authenticates with the RIPE Database **write** API key
 (`TEST` or `RIPE`). inetnum pushes send the edited attributes directly and do
 **not** use the template engine. Read/query operations (import, overlap search)
 remain anonymous and need no key.
+
+---
+
+## Prefix Changes & the Review Queue
+
+Editing NetBox no longer writes to the RIPE Database directly. When a prefix with
+`ripe_report = True` is created, updated, or deleted (or you click **Sync Now**),
+the plugin:
+
+1. Generates the intended `inetnum` / `inet6num` object from its template.
+2. Creates (or refreshes) a local editable mirror (`RipeInetnumObject`).
+3. Records a **pending change** (`RipeChange`) — a *task to write* — in the
+   **RIPE Sync → Pending Changes** queue, with a diff against the current RIPE
+   state and a note on the My Resources membership check (below).
+
+**No data is sent to RIPE at this point.** A human must open the change and
+**Confirm & push** it (see [Editing & Pushing Changes](#editing--pushing-changes)).
+Per-prefix history shows status **Queued for review** in the sync log. Repeated
+saves of the same prefix update the existing pending change rather than piling up
+duplicates.
+
+This applies uniformly to prefix-driven changes and to manual edits of imported
+inetnum/route/domain objects — everything funnels through the same review queue
+and the same confirmed-push step.
+
+### My Resources Membership Check
+
+Before *any* prefix-bearing object (`inetnum`, `inet6num`, `route`, `route6`) is
+written to the RIPE Database, the plugin counter-checks that the prefix is
+contained within one of your RIPE LIR Portal **My Resources** allocations or
+assignments. This prevents accidentally creating or modifying RIPE objects for
+address space that is not yours.
+
+- The check runs at **push time** (the actual write). A change whose prefix is
+  not a member is **refused** and recorded as *failed* with an explanatory
+  message; nothing is written to RIPE.
+- It also runs advisorily when a prefix change is **queued**, annotating the
+  change so reviewers see upfront whether it will be accepted.
+- The My Resources network list (allocations + assignments + legacy/ERX) is
+  fetched via the LIR Portal API and cached for `my_resources_cache_ttl` seconds
+  (default 1 hour). Run the My Resources import or wait for the cache to expire
+  after acquiring new resources.
+- Controlled by `require_my_resources_membership` (default `True`). It requires
+  `lir_portal_api_key` to be set; if the resource list cannot be fetched while
+  enforcement is on, the push **fails closed** (is refused). Set it to `False`
+  to downgrade the check to a logged warning.
+
+Membership is by containment: a prefix equal to or inside any held
+allocation/assignment passes. `domain` objects are not prefix-bearing and are
+not subject to this check.
 
 ---
 

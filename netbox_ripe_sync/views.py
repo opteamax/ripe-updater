@@ -408,11 +408,16 @@ class RipeChangeCancelView(LoginRequiredMixin, View):
 class RipeChangePushView(LoginRequiredMixin, View):
     """Push a single change to RIPE. Requires an explicit confirmation field."""
 
+    # Object types whose primary attribute is a prefix — subject to the
+    # My Resources membership counter-check before a create/modify write.
+    _PREFIX_TYPES = ('inetnum', 'inet6num', 'route', 'route6')
+
     def post(self, request, pk):
         from datetime import datetime, timezone
         from .exceptions import RipeSyncException
         from .ripe_db_writer import RipeDbWriter
         from .forms import attributes_to_fields
+        from .resource_check import assert_within_my_resources
 
         change = get_object_or_404(RipeChange, pk=pk)
 
@@ -428,6 +433,13 @@ class RipeChangePushView(LoginRequiredMixin, View):
         target = change.target
         now = datetime.now(tz=timezone.utc)
         try:
+            # Counter-check: never create/modify a RIPE object for a prefix that
+            # is not within our RIPE My Resources allocations/assignments.
+            if (change.operation in (RipeChange.OP_CREATE, RipeChange.OP_MODIFY)
+                    and change.object_type in self._PREFIX_TYPES):
+                prefix_for_check = getattr(target, 'prefix', None) or change.primary_key
+                assert_within_my_resources(prefix_for_check)
+
             writer = RipeDbWriter()
             if change.operation == RipeChange.OP_DELETE:
                 resp = writer.delete(change.object_type, change.primary_key)

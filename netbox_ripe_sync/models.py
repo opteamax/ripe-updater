@@ -18,10 +18,12 @@ class RipeSyncLog(models.Model):
     STATUS_SUCCESS = 'success'
     STATUS_FAILED = 'failed'
     STATUS_SKIPPED = 'skipped'
+    STATUS_QUEUED = 'queued'
     STATUS_CHOICES = [
         (STATUS_SUCCESS, 'Success'),
         (STATUS_FAILED, 'Failed'),
         (STATUS_SKIPPED, 'Skipped'),
+        (STATUS_QUEUED, 'Queued for review'),
     ]
 
     prefix = models.CharField(max_length=50, db_index=True)
@@ -49,6 +51,7 @@ class RipeSyncLog(models.Model):
             self.STATUS_SUCCESS: 'success',
             self.STATUS_FAILED: 'danger',
             self.STATUS_SKIPPED: 'warning',
+            self.STATUS_QUEUED: 'info',
         }.get(self.status, 'secondary')
 
 
